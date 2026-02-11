@@ -1,7 +1,6 @@
 {
   $schema: 'https://docs.renovatebot.com/renovate-schema.json',
   extends: [
-    'github>lehigh-university-libraries/renovate-config',
-    'github>lehigh-university-libraries/renovate-config:weeklyBump.json5',
+    "config:recommended"
   ],
 }
