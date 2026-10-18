@@ -1,0 +1,52 @@
+on:
+  schedule:
+    - cron: '0 0 * * 1'
+
+name: Scheduled Release
+jobs:
+  release:
+    name: Create Weekly Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+
+      - name: Create weekly release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          LATEST=$(gh release view --json tagName -q .tagName 2>/dev/null || true)
+
+          if [ -z "$LATEST" ]; then
+            if git rev-parse --verify --quiet HEAD^ >/dev/null; then
+              CHANGES=$(git log --oneline)
+            else
+              CHANGES=$(git rev-list --count HEAD)
+            fi
+
+            if [ -z "$CHANGES" ] || [ "$CHANGES" = "0" ]; then
+              echo "No commits found, skipping release."
+              exit 0
+            fi
+
+            TAG="v0.0.1"
+          else
+            CHANGES=$(git log "${LATEST}..HEAD" --oneline)
+            if [ -z "$CHANGES" ]; then
+              echo "No changes since ${LATEST}, skipping release."
+              exit 0
+            fi
+
+            MAJOR=$(echo "$LATEST" | sed 's/^v//' | cut -d. -f1)
+            MINOR=$(echo "$LATEST" | sed 's/^v//' | cut -d. -f2)
+            PATCH=$(echo "$LATEST" | sed 's/^v//' | cut -d. -f3)
+            TAG="v${MAJOR}.${MINOR}.$((PATCH + 1))"
+          fi
+
+          gh release create "$TAG" --title "$TAG" --generate-notes

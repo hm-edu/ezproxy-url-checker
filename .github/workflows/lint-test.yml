@@ -2,6 +2,8 @@ name: lint-test
 
 on:
   push:
+  pull_request:
+  merge_group:
 
 jobs:
   lint:
@@ -45,10 +47,10 @@ jobs:
           docker exec $CONTAINER /bin/bash /app/scripts/test.sh
           docker stop $CONTAINER
   build-push-ghcr:
+    if: github.event_name == 'push'
     needs: [test]
     uses: lehigh-university-libraries/gha/.github/workflows/build-push-ghcr.yaml@main
     permissions:
       contents: read
       packages: write
     secrets: inherit
-
