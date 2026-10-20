@@ -41,11 +41,17 @@ jobs:
           CONTAINER=$(docker run \
             --rm \
             -d \
-            -v $(pwd)/config:/app/config \
+            -p 127.0.0.1:8888:8888 \
+            -v "$(pwd)/config:/app/config:ro" \
             ezproxy-url-checker:ci)
-          docker logs $CONTAINER
-          docker exec $CONTAINER /bin/bash /app/scripts/test.sh
-          docker stop $CONTAINER
+          trap 'docker stop "$CONTAINER" >/dev/null' EXIT
+          for attempt in {1..30}; do
+            if curl --silent --fail "http://127.0.0.1:8888/proxyUrl?url=scholar.google.com" >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          ./scripts/test.sh
   build-push-ghcr:
     if: github.event_name == 'push'
     needs: [test]

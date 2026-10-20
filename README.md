@@ -4,7 +4,7 @@ Check whether a URL exists in your EZproxy config.
 
 ## Quickstart
 
-Download the binary from [the latest release](https://github.com/lehigh-university-libraries/ezproxy-url-checker/releases/latest). An automated way to do that might be:
+Download the binary from [the latest release](https://github.com/hm-edu/ezproxy-url-checker/releases/latest). An automated way to do that might be:
 
 ```
 ./scripts/download-binary.sh
@@ -34,7 +34,7 @@ To deploy this service to a server, first, you'll need to deploy the binary to y
 
 ```
 $ cd /opt
-$ git clone https://github.com/lehigh-university-libraries/ezproxy-url-checker.git
+$ git clone https://github.com/hm-edu/ezproxy-url-checker.git
 $ cd ezproxy-url-checker
 $ ./scripts/download-binary.sh
 ```
@@ -67,9 +67,26 @@ $ systemctl start ezproxy-url-checker.service
 
 ### docker
 
+Generate the config files on the host, then mount them read-only when starting the
+image. Replace `<release-tag>` with a published release tag:
+
+```sh
+./scripts/generate-files.sh /path/to/ezproxy/config.txt/folder
+docker run --rm \
+  --read-only \
+  --cap-drop=ALL \
+  --security-opt=no-new-privileges \
+  -p 8888:8888 \
+  -v "$PWD/config:/app/config:ro" \
+  ghcr.io/hm-edu/ezproxy-url-checker:<release-tag>
+```
+
+The container runs as an unprivileged user and listens on port `8888` by default.
+The config files must be readable by UID `65532`; set `LISTEN` to change the
+address and port.
+
 ## TODO
 
 - [x] Integration tests
 - [ ] CI/CD instructions
 - [ ] Better API Documentation
-- [ ] Add docker deployment instructions

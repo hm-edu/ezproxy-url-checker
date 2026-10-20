@@ -1,11 +1,24 @@
-FROM golang:1.24-bullseye@sha256:2cdc80dc25edcb96ada1654f73092f2928045d037581fa4aa7c40d18af7dd85a
+FROM golang:1.27-alpine@sha256:f2c872bcee949b7be9c490efd02b48a8a2fbf947cdf533f1c58525ec9d8170fd AS build
+
+WORKDIR /src
+
+COPY go.mod ./
+RUN go mod download
+
+COPY main.go ./
+RUN CGO_ENABLED=0 GOOS=linux go build \
+  -trimpath \
+  -ldflags="-s -w -buildid=" \
+  -o /out/ezproxy-url-checker \
+  .
+
+FROM scratch
+
+COPY --from=build /etc/ssl/cert.pem /etc/ssl/cert.pem
+COPY --from=build /out/ezproxy-url-checker /app/ezproxy-url-checker
 
 WORKDIR /app
+USER 1000:1000
+EXPOSE 8888
 
-COPY . ./
-
-RUN go mod download \
-  && go build \
-  && go clean -cache -modcache
-
-ENTRYPOINT [ "/app/ezproxy-url-checker"]
+ENTRYPOINT ["/app/ezproxy-url-checker"]
