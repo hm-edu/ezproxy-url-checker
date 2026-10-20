@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -18,7 +19,36 @@ type EzproxyComponents struct {
 
 var e EzproxyComponents
 
-func init() {
+func main() {
+	cmd := "serve"
+	if len(os.Args) > 1 {
+		cmd = os.Args[1]
+	}
+
+	switch cmd {
+	case "serve":
+		loadConfig()
+		serve()
+	case "generate":
+		if err := runGenerate(os.Args[2:], os.Stdout, os.Stderr); err != nil {
+			fmt.Fprintln(os.Stderr, "Error:", err)
+			os.Exit(1)
+		}
+	case "help", "-h", "--help":
+		usage(os.Stdout)
+	default:
+		usage(os.Stderr)
+		os.Exit(2)
+	}
+}
+
+func usage(w io.Writer) {
+	fmt.Fprintln(w, "Usage:")
+	fmt.Fprintln(w, "  ezproxy-url-checker [serve]                            start the HTTP service (reads config/*.txt)")
+	fmt.Fprintln(w, "  ezproxy-url-checker generate [-out DIR] <ezproxy-dir>  extract the lists from an EZProxy config.txt")
+}
+
+func loadConfig() {
 	var err error
 	e.Urls, err = populateMap("config/urls.txt")
 	if err != nil {
@@ -34,7 +64,7 @@ func init() {
 	}
 }
 
-func main() {
+func serve() {
 	http.HandleFunc("/proxyUrl", checkUrl)
 
 	listen := os.Getenv("LISTEN")
