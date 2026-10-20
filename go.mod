@@ -1,3 +1,3 @@
-module github.com/lehigh-university-libraries/ezproxy-url-checker
+module github.com/hm-edu/ezproxy-url-checker
 
-go 1.21
+go 1.27
