@@ -18,6 +18,9 @@ jobs:
         with:
           go-version: 1.27
 
+      - name: go test
+        run: go test ./...
+
       - name: golangci-lint
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
@@ -39,7 +42,12 @@ jobs:
       - name: Run tests
         shell: bash
         run: |-
-          ./scripts/generate-files.sh $(pwd)/fixtures
+          # generate the config files with the image itself, as documented in the README
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            -v "$(pwd)/fixtures:/fixtures:ro" \
+            -v "$(pwd)/config:/app/config" \
+            ezproxy-url-checker:ci generate /fixtures
           CONTAINER=$(docker run \
             --rm \
             -d \
@@ -57,8 +65,48 @@ jobs:
   build-push-ghcr:
     if: github.event_name == 'push'
     needs: [test]
-    uses: lehigh-university-libraries/gha/.github/workflows/build-push-ghcr.yaml@e26d86abfbe300be4d93570b666651c11471995b # main
+    runs-on: ubuntu-26.04
     permissions:
       contents: read
       packages: write
-    secrets: inherit
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+
+      - name: Log into ghcr.io
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Branch pushes are published under the branch name (e.g. `main`).
+      # Tag pushes publish the release tag plus its semver aliases and `latest`:
+      #   v1.2.3 -> v1.2.3, 1.2.3, 1.2, 1, latest
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}},enable=${{ !startsWith(github.ref, 'refs/tags/v0.') }}
+
+      - name: Build and push
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

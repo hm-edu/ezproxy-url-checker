@@ -13,9 +13,13 @@ Download the binary from [the latest release](https://github.com/hm-edu/ezproxy-
 Generate the files the service needs from your EZProxy config and start the service
 
 ```
-./scripts/generate-files.sh /path/to/ezproxy/config.txt/folder
+./ezproxy-url-checker generate /path/to/ezproxy/config.txt/folder
 ./ezproxy-url-checker
 ```
+
+`generate` reads `config.txt` and every file it pulls in via `IncludeFile`, and writes
+the `URL`, `Host`/`HJ` and `Domain` entries to `config/urls.txt`, `config/hosts.txt`
+and `config/domains.txt` (use `-out DIR` to write them somewhere else).
 
 See if google scholar is in your EZproxy config
 
@@ -67,11 +71,22 @@ $ systemctl start ezproxy-url-checker.service
 
 ### docker
 
-Generate the config files on the host, then mount them read-only when starting the
-image. Replace `<release-tag>` with a published release tag:
+Each release `vX.Y.Z` is published to GHCR as `vX.Y.Z`, `X.Y.Z`, `X.Y`, `X` and
+`latest`; every push to `main` is published as `main`. Replace `<release-tag>` below
+with one of those tags.
+
+The image contains only the static binary, so use its `generate` subcommand to
+create the config files from your EZProxy directory, then mount them read-only when
+starting the service:
 
 ```sh
-./scripts/generate-files.sh /path/to/ezproxy/config.txt/folder
+mkdir -p config
+docker run --rm \
+  --user "$(id -u):$(id -g)" \
+  -v /path/to/ezproxy/config.txt/folder:/ezproxy:ro \
+  -v "$PWD/config:/app/config" \
+  ghcr.io/hm-edu/ezproxy-url-checker:<release-tag> generate /ezproxy
+
 docker run --rm \
   --read-only \
   --cap-drop=ALL \
@@ -81,9 +96,8 @@ docker run --rm \
   ghcr.io/hm-edu/ezproxy-url-checker:<release-tag>
 ```
 
-The container runs as an unprivileged user and listens on port `8888` by default.
-The config files must be readable by UID `65532`; set `LISTEN` to change the
-address and port.
+The container runs as UID `1000` and listens on port `8888` by default. The config
+files must be readable by that user; set `LISTEN` to change the address and port.
 
 ## TODO
 
